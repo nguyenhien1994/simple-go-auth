@@ -34,8 +34,7 @@ func main() {
 	// TODO: config in json instead
 	redisInfo := redis.RedisClientInfo{redis_host, redis_port, redis_password}
 
-	redisClient := redis.NewRedisClient(redisInfo)
-
+	redisClient := redis.InitRedisClient(redisInfo)
 	authService := auth.NewAuthService(redisClient)
 	tokenUtils  := auth.NewTokenUtils(os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
 	handlers    := handlers.NewHandlers(authService, tokenUtils)
@@ -57,14 +56,14 @@ func main() {
 		}
 	}()
 
-	//Wait for interrupt signal to gracefully shutdown the server
+	// Wait for interrupt signal to gracefully shutdown the server
 	sigs := make(chan os.Signal)
 	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 	<-sigs
-	log.Println("Shuting down the server ...")
+	log.Println("Shuting down the server...")
 
 	if err := srv.Shutdown(context.Background()); err != nil {
-		log.Fatal("Failed to gracefully shutdown the server:", err)
+		log.Fatal("Failed to shutdown the server:", err)
 	}
 	log.Println("Finished shutdown")
 }

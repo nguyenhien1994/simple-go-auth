@@ -2,6 +2,7 @@ package redis
 
 import (
 	"github.com/go-redis/redis/v8"
+	"sync"
 )
 
 type RedisClientInfo struct {
@@ -10,12 +11,17 @@ type RedisClientInfo struct {
 	Password string `json:"password"`
 }
 
-func NewRedisClient(info RedisClientInfo) *redis.Client {
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     info.Host + ":" + info.Port,
-		Password: info.Password,
-		DB:       0,
+var RedisClientInstance *redis.Client
+var RedisClientInstanceOnce sync.Once
+
+func InitRedisClient(info RedisClientInfo) *redis.Client {
+	RedisClientInstanceOnce.Do(func() {
+		RedisClientInstance = redis.NewClient(&redis.Options{
+			Addr:     info.Host + ":" + info.Port,
+			Password: info.Password,
+			DB:       0,
+		})
 	})
 
-	return redisClient
+	return RedisClientInstance
 }
