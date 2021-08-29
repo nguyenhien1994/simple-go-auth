@@ -15,10 +15,10 @@ type AccessDetails struct {
 }
 
 type AuthInterface interface {
-	CreateAuth(string, *TokenDetails) error
-	FetchAuth(string) (string, error)
-	DeleteRefresh(string) error
-	DeleteTokens(*AccessDetails) error
+	CreateAuth(context.Context, string, *TokenDetails) error
+	FetchAuthUserId(context.Context, string) (string, error)
+	DeleteRefresh(context.Context, string) error
+	DeleteTokens(context.Context, *AccessDetails) error
 }
 
 type service struct {
@@ -29,18 +29,18 @@ func NewAuthService(client *redis.Client) *service {
 	return &service{client: client}
 }
 
-//Save token metadata to Redis
-func (s *service) CreateAuth(userId string, tokenDetails *TokenDetails) error {
-	//converting Unix to UTC(to Time object)
+// Save token metadata to Redis
+func (s *service) CreateAuth(ctx context.Context, userId string, tokenDetails *TokenDetails) error {
+	// converting Unix to UTC(to Time object)
 	at := time.Unix(tokenDetails.AtExpires, 0)
 	rt := time.Unix(tokenDetails.RtExpires, 0)
 	now := time.Now()
 
-	atCreated, err := s.client.Set(context.Background(), tokenDetails.TokenUuid, userId, at.Sub(now)).Result()
+	atCreated, err := s.client.Set(ctx, tokenDetails.TokenUuid, userId, at.Sub(now)).Result()
 	if err != nil {
 		return err
 	}
-	rtCreated, err := s.client.Set(context.Background(), tokenDetails.RefreshUuid, userId, rt.Sub(now)).Result()
+	rtCreated, err := s.client.Set(ctx, tokenDetails.RefreshUuid, userId, rt.Sub(now)).Result()
 	if err != nil {
 		return err
 	}
@@ -50,41 +50,43 @@ func (s *service) CreateAuth(userId string, tokenDetails *TokenDetails) error {
 	return nil
 }
 
-//Check the metadata saved
-func (s *service) FetchAuth(tokenUuid string) (string, error) {
-	userid, err := s.client.Get(context.Background(), tokenUuid).Result()
+// Check the metadata saved
+func (s *service) FetchAuthUserId(ctx context.Context, tokenUuid string) (string, error) {
+	userid, err := s.client.Get(ctx, tokenUuid).Result()
 	if err != nil {
 		return "", err
 	}
 	return userid, nil
 }
 
-//Once a user row in the token table
-func (s *service) DeleteTokens(authD *AccessDetails) error {
+// Once a user row in the token table
+func (s *service) DeleteTokens(ctx context.Context, authD *AccessDetails) error {
 	//get the refresh uuid
 	refreshUuid := fmt.Sprintf("%s++%s", authD.TokenUuid, authD.UserId)
 	//delete access token
-	deletedAt, err := s.client.Del(context.Background(), authD.TokenUuid).Result()
+	deletedAt, err := s.client.Del(ctx, authD.TokenUuid).Result()
 	if err != nil {
 		return err
 	}
 	//delete refresh token
-	deletedRt, err := s.client.Del(context.Background(), refreshUuid).Result()
+	deletedRt, err := s.client.Del(ctx, refreshUuid).Result()
 	if err != nil {
 		return err
 	}
 	//When the record is deleted, the return value is 1
 	if deletedAt != 1 || deletedRt != 1 {
-		return errors.New("something went wrong")
+		return errors.New("Can't delete metadata from Redis")
 	}
 	return nil
 }
 
-func (s *service) DeleteRefresh(refreshUuid string) error {
+func (s *service) DeleteRefresh(ctx context.Context, refreshUuid string) error {
 	//delete refresh token
-	deleted, err := s.client.Del(context.Background(), refreshUuid).Result()
-	if err != nil || deleted == 0 {
+	deleted, err := s.client.Del(ctx, refreshUuid).Result()
+	if err != nil {
 		return err
+	} else if deleted == 0 {
+		return errors.New("token expired")
 	}
 	return nil
 }

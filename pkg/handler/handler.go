@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"simple-go-auth/pkg/auth"
 	"net/http"
-	"os"
 )
 
 // handler struct
@@ -44,19 +42,19 @@ func (h *handler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, "Invalid json provided")
 		return
 	}
-	//compare the user from the request, with the one we defined:
+	// compare the user from the request with sample user defined above
 	if user.Username != u.Username || user.Password != u.Password {
 		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
 		return
 	}
+
 	ts, err := h.token.CreateToken(user.ID)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	saveErr := h.authService.CreateAuth(user.ID, ts)
-	if saveErr != nil {
-		c.JSON(http.StatusUnprocessableEntity, saveErr.Error())
+	if err := h.authService.CreateAuth(c, user.ID, ts); err != nil {
+		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	tokens := map[string]string{
@@ -67,12 +65,11 @@ func (h *handler) Login(c *gin.Context) {
 }
 
 func (h *handler) Logout(c *gin.Context) {
-	//If metadata is passed and the tokens valid, delete them from the redis store
+	// If metadata is passed and the tokens valid, delete them from the redis store
 	metadata, _ := h.token.ExtractTokenMetadata(c.Request)
 	if metadata != nil {
-		deleteErr := h.authService.DeleteTokens(metadata)
-		if deleteErr != nil {
-			c.JSON(http.StatusBadRequest, deleteErr.Error())
+		if err := h.authService.DeleteTokens(c, metadata); err != nil {
+			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 	}
@@ -90,72 +87,59 @@ func (h *handler) CreateTodo(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	userId, err := h.authService.FetchAuth(metadata.TokenUuid)
+	userId, err := h.authService.FetchAuthUserId(c, metadata.TokenUuid)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	td.UserID = userId
 
-	//you can proceed to save the  to a database
-
+	// return Todo struct
 	c.JSON(http.StatusCreated, td)
 }
 
 func (h *handler) Refresh(c *gin.Context) {
-	mapToken := map[string]string{}
-	if err := c.ShouldBindJSON(&mapToken); err != nil {
+	tokenMap := map[string]string{}
+	if err := c.ShouldBindJSON(&tokenMap); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	refreshToken := mapToken["refresh_token"]
-
-	//verify the token
-	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(os.Getenv("REFRESH_SECRET")), nil
-	})
-	//if there is an error, the token must have expired
+	// verify the token
+	token, err := h.token.VerifyTokenRefreshToken(tokenMap["refresh_token"])
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, "Refresh token expired")
+		c.JSON(http.StatusUnauthorized, "invalid refresh token")
 		return
 	}
-	//is token valid?
-	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+	if _, ok := token.Claims.(jwt.Claims); !ok || !token.Valid {
 		c.JSON(http.StatusUnauthorized, err)
 		return
 	}
-	//Since token is valid, get the uuid:
-	claims, ok := token.Claims.(jwt.MapClaims) //the token claims should conform to MapClaims
-	if ok && token.Valid {
-		refreshUuid, ok := claims["refresh_uuid"].(string) //convert the interface to string
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		refreshUuid, ok := claims["refresh_uuid"].(string)
 		if !ok {
 			c.JSON(http.StatusUnprocessableEntity, err)
 			return
 		}
-		userId, roleOk := claims["user_id"].(string)
-		if roleOk == false {
+		userId, ok := claims["user_id"].(string)
+		if !ok {
 			c.JSON(http.StatusUnprocessableEntity, "unauthorized")
 			return
 		}
-		//Delete the previous Refresh Token
-		delErr := h.authService.DeleteRefresh(refreshUuid)
-		if delErr != nil { //if any goes wrong
+		// Check refresh token in Redis and delete the previous refresh token
+		if err := h.authService.DeleteRefresh(c, refreshUuid); err != nil {
 			c.JSON(http.StatusUnauthorized, "unauthorized")
 			return
 		}
-		//Create new pairs of refresh and access tokens
-		ts, createErr := h.token.CreateToken(userId)
-		if createErr != nil {
-			c.JSON(http.StatusForbidden, createErr.Error())
+		// Create new pairs of refresh and access tokens
+		ts, err := h.token.CreateToken(userId)
+		if err != nil {
+			c.JSON(http.StatusForbidden, err.Error())
 			return
 		}
-		//save the tokens metadata to redis
-		saveErr := h.authService.CreateAuth(userId, ts)
-		if saveErr != nil {
-			c.JSON(http.StatusForbidden, saveErr.Error())
+		// Save the tokens metadata to redis
+		if err := h.authService.CreateAuth(c, userId, ts); err != nil {
+			c.JSON(http.StatusForbidden, err.Error())
 			return
 		}
 		tokens := map[string]string{
@@ -164,6 +148,6 @@ func (h *handler) Refresh(c *gin.Context) {
 		}
 		c.JSON(http.StatusCreated, tokens)
 	} else {
-		c.JSON(http.StatusUnauthorized, "refresh expired")
+		c.JSON(http.StatusUnauthorized, "refresh token expired")
 	}
 }

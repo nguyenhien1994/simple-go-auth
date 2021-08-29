@@ -6,10 +6,18 @@ import (
 	"net/http"
 )
 
-func TokenAuthMiddleware() gin.HandlerFunc {
+// handler struct
+type middleware struct {
+	token auth.TokenInterface
+}
+
+func NewMiddleWare(token auth.TokenInterface) *middleware {
+	return &middleware{token}
+}
+
+func (m *middleware) TokenAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := auth.TokenValid(c.Request)
-		if err != nil  {
+		if err := m.token.TokenValid(c.Request); err != nil  {
 			c.JSON(http.StatusUnauthorized, "unauthorized")
 			c.Abort()
 			return

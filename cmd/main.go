@@ -36,14 +36,15 @@ func main() {
 
 	redisClient := redis.NewRedisClient(redisInfo)
 
-	var authService = auth.NewAuthService(redisClient)
-	var token = auth.NewToken(os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
-	var handlers = handlers.NewHandlers(authService, token)
+	authService := auth.NewAuthService(redisClient)
+	tokenUtils  := auth.NewTokenUtils(os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
+	handlers    := handlers.NewHandlers(authService, tokenUtils)
+	mid         := middleware.NewMiddleWare(tokenUtils)
 
-	var router = gin.Default()
+	router := gin.Default()
 	router.POST("/login", handlers.Login)
-	router.POST("/todo", middleware.TokenAuthMiddleware(), handlers.CreateTodo)
-	router.POST("/logout", middleware.TokenAuthMiddleware(), handlers.Logout)
+	router.POST("/todo", mid.TokenAuthMiddleware(), handlers.CreateTodo)
+	router.POST("/logout", mid.TokenAuthMiddleware(), handlers.Logout)
 	router.POST("/refresh", handlers.Refresh)
 
 	srv := &http.Server{

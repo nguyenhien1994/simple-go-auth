@@ -3,7 +3,6 @@ package auth
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -22,38 +21,27 @@ type TokenDetails struct {
 	RtExpires    int64
 }
 
-type tokenservice struct {
+type tokenUtils struct {
 	accessSecret  string
 	refreshSecret string
 }
 
-func NewToken(accessSecret string, refreshSecret string) *tokenservice {
-	return &tokenservice{accessSecret, refreshSecret}
+func NewTokenUtils(accessSecret string, refreshSecret string) *tokenUtils {
+	return &tokenUtils{accessSecret, refreshSecret}
 }
 
 type TokenInterface interface {
 	CreateToken(userId string) (*TokenDetails, error)
 	ExtractTokenMetadata(*http.Request) (*AccessDetails, error)
+	TokenValid(r *http.Request) error
+	VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error)
 }
 
-func generateNewTokenDetails(userId string) *TokenDetails {
-	td := &TokenDetails{}
-	// access token expires after 10 min
-	td.AtExpires = time.Now().Add(time.Minute * 10).Unix()
-	td.TokenUuid = uuid.NewV4().String()
-
-	// refresh token expires after 24h
-	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
-	td.RefreshUuid = td.TokenUuid + "++" + userId
-
-	return td
-}
-
-func (t *tokenservice) CreateToken(userId string) (*TokenDetails, error) {
+func (t *tokenUtils) CreateToken(userId string) (*TokenDetails, error) {
 	td := generateNewTokenDetails(userId)
 
 	var err error
-	//Creating Access Token
+	// Creating access token
 	atClaims := jwt.MapClaims{}
 	atClaims["access_uuid"] = td.TokenUuid
 	atClaims["user_id"] = userId
@@ -64,6 +52,7 @@ func (t *tokenservice) CreateToken(userId string) (*TokenDetails, error) {
 		return nil, err
 	}
 
+	// Creating refresh token
 	rtClaims := jwt.MapClaims{}
 	rtClaims["refresh_uuid"] = td.RefreshUuid
 	rtClaims["user_id"] = userId
@@ -77,8 +66,20 @@ func (t *tokenservice) CreateToken(userId string) (*TokenDetails, error) {
 	return td, nil
 }
 
-func TokenValid(r *http.Request) error {
-	token, err := verifyToken(r)
+func (t *tokenUtils) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
+	token, err := verifyAccessToken(r)
+	if err != nil {
+		return nil, err
+	}
+	acc, err := extract(token)
+	if err != nil {
+		return nil, err
+	}
+	return acc, nil
+}
+
+func (t *tokenUtils) TokenValid(r *http.Request) error {
+	token, err := verifyAccessToken(r)
 	if err != nil {
 		return err
 	}
@@ -88,22 +89,12 @@ func TokenValid(r *http.Request) error {
 	return nil
 }
 
-func verifyToken(r *http.Request) (*jwt.Token, error) {
-	tokenString := extractToken(r)
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		log.Println("token.Method: ", token.Method)
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(os.Getenv("ACCESS_SECRET")), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return token, nil
+func (t *tokenUtils) VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error) {
+	// verify the token
+	return verifyToken(tokenStr, t.refreshSecret)
 }
 
-//get the token from the request body
+// get the token from the request body
 func extractToken(r *http.Request) string {
 	bearToken := r.Header.Get("Authorization")
 	strArr := strings.Split(bearToken, " ")
@@ -127,17 +118,35 @@ func extract(token *jwt.Token) (*AccessDetails, error) {
 			}, nil
 		}
 	}
-	return nil, errors.New("something went wrong")
+	return nil, errors.New("failed to extract token from request")
 }
 
-func (t *tokenservice) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
-	token, err := verifyToken(r)
+func generateNewTokenDetails(userId string) *TokenDetails {
+	td := &TokenDetails{}
+	// access token expires after 10 min
+	td.AtExpires = time.Now().Add(time.Minute * 10).Unix()
+	td.TokenUuid = uuid.NewV4().String()
+
+	// refresh token expires after 24h
+	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
+	td.RefreshUuid = td.TokenUuid + "++" + userId
+
+	return td
+}
+
+func verifyToken(tokenStr string, secret string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	acc, err := extract(token)
-	if err != nil {
-		return nil, err
-	}
-	return acc, nil
+	return token, nil
+}
+
+func verifyAccessToken(r *http.Request) (*jwt.Token, error) {
+	return verifyToken(extractToken(r), os.Getenv("ACCESS_SECRET"))
 }
