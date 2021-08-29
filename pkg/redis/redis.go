@@ -14,7 +14,7 @@ type RedisClientInfo struct {
 var RedisClientInstance *redis.Client
 var RedisClientInstanceOnce sync.Once
 
-func InitRedisClient(info RedisClientInfo) *redis.Client {
+func GetRedisClient(info RedisClientInfo) *redis.Client {
 	RedisClientInstanceOnce.Do(func() {
 		RedisClientInstance = redis.NewClient(&redis.Options{
 			Addr:     info.Host + ":" + info.Port,

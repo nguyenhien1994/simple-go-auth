@@ -34,7 +34,7 @@ func main() {
 	// TODO: config in json instead
 	redisInfo := redis.RedisClientInfo{redis_host, redis_port, redis_password}
 
-	redisClient := redis.InitRedisClient(redisInfo)
+	redisClient := redis.GetRedisClient(redisInfo)
 	authService := auth.NewAuthService(redisClient)
 	tokenUtils  := auth.NewTokenUtils(os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
 	handlers    := handlers.NewHandlers(authService, tokenUtils)
