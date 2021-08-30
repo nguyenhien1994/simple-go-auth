@@ -1,24 +1,20 @@
 package redis
 
 import (
-	"github.com/go-redis/redis/v8"
+	"os"
 	"sync"
-)
 
-type RedisClientInfo struct {
-	Host     string `json:"host"`
-	Port     string `json:"port"`
-	Password string `json:"password"`
-}
+	"github.com/go-redis/redis/v8"
+)
 
 var RedisClientInstance *redis.Client
 var RedisClientInstanceOnce sync.Once
 
-func GetRedisClient(info RedisClientInfo) *redis.Client {
+func GetRedisClient() *redis.Client {
 	RedisClientInstanceOnce.Do(func() {
 		RedisClientInstance = redis.NewClient(&redis.Options{
-			Addr:     info.Host + ":" + info.Port,
-			Password: info.Password,
+			Addr:     os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT"),
+			Password: os.Getenv("REDIS_PASSWORD"),
 			DB:       0,
 		})
 	})

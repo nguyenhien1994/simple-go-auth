@@ -11,18 +11,9 @@ import (
 	"github.com/casbin/casbin/persist"
 )
 
-// handler struct
-type middleware struct {
-	token auth.TokenInterface
-}
-
-func NewMiddleWare(token auth.TokenInterface) *middleware {
-	return &middleware{token}
-}
-
-func (m *middleware) TokenAuthMiddleware() gin.HandlerFunc {
+func TokenAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := m.token.TokenValid(c.Request); err != nil {
+		if err := auth.GetTokenService().TokenValid(c.Request); err != nil {
 			c.JSON(http.StatusUnauthorized, "unauthorized")
 			c.Abort()
 			return
@@ -32,15 +23,15 @@ func (m *middleware) TokenAuthMiddleware() gin.HandlerFunc {
 }
 
 // Authorize determines if current subject has been authorized to take an action on an object.
-func (m *middleware) Authorize(obj string, act string, adapter persist.Adapter) gin.HandlerFunc {
+func Authorize(obj string, act string, adapter persist.Adapter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := m.token.TokenValid(c.Request)
+		err := auth.GetTokenService().TokenValid(c.Request)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, "user hasn't logged in yet")
 			c.Abort()
 			return
 		}
-		metadata, err := m.token.ExtractTokenMetadata(c.Request)
+		metadata, err := auth.GetTokenService().ExtractTokenMetadata(c.Request)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, "unauthorized")
 			return

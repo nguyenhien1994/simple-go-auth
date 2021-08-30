@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -21,13 +22,19 @@ type TokenDetails struct {
 	RtExpires    int64
 }
 
-type tokenUtils struct {
+type TokenService struct {
 	accessSecret  string
 	refreshSecret string
 }
 
-func NewTokenUtils(accessSecret string, refreshSecret string) *tokenUtils {
-	return &tokenUtils{accessSecret, refreshSecret}
+var tokenUtilsInstance *TokenService
+var tokenUtilsInstanceOnce sync.Once
+
+func GetTokenService() *TokenService {
+	tokenUtilsInstanceOnce.Do(func() {
+		tokenUtilsInstance = &TokenService{os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET")}
+	})
+	return tokenUtilsInstance
 }
 
 type TokenInterface interface {
@@ -37,7 +44,7 @@ type TokenInterface interface {
 	VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error)
 }
 
-func (t *tokenUtils) CreateToken(userId string, username string) (*TokenDetails, error) {
+func (t *TokenService) CreateToken(userId string, username string) (*TokenDetails, error) {
 	td := generateNewTokenDetails(userId)
 
 	var err error
@@ -68,7 +75,7 @@ func (t *tokenUtils) CreateToken(userId string, username string) (*TokenDetails,
 	return td, nil
 }
 
-func (t *tokenUtils) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
+func (t *TokenService) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
 	token, err := verifyAccessToken(r)
 	if err != nil {
 		return nil, err
@@ -80,7 +87,7 @@ func (t *tokenUtils) ExtractTokenMetadata(r *http.Request) (*AccessDetails, erro
 	return acc, nil
 }
 
-func (t *tokenUtils) TokenValid(r *http.Request) error {
+func (t *TokenService) TokenValid(r *http.Request) error {
 	token, err := verifyAccessToken(r)
 	if err != nil {
 		return err
@@ -91,7 +98,7 @@ func (t *tokenUtils) TokenValid(r *http.Request) error {
 	return nil
 }
 
-func (t *tokenUtils) VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error) {
+func (t *TokenService) VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error) {
 	// verify the token
 	return verifyToken(tokenStr, t.refreshSecret)
 }

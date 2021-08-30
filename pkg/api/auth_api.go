@@ -1,31 +1,16 @@
-package handlers
+package api
 
 import (
 	"net/http"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
 	"simple-go-auth/pkg/auth"
 	"simple-go-auth/pkg/users"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
 )
 
-// handler struct
-type handler struct {
-	authService auth.AuthInterface
-	token       auth.TokenInterface
-}
-
-type Todo struct {
-	UserID string `json:"user_id"`
-	Title  string `json:"title"`
-	Body   string `json:"body"`
-}
-
-func NewHandlers(authService auth.AuthInterface, token auth.TokenInterface) *handler {
-	return &handler{authService, token}
-}
-
-func (h *handler) Login(c *gin.Context) {
+func Login(c *gin.Context) {
 	var u users.User
 	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, "Invalid json provided")
@@ -44,12 +29,12 @@ func (h *handler) Login(c *gin.Context) {
 		return
 	}
 
-	ts, err := h.token.CreateToken(user.ID, user.Username)
+	ts, err := auth.GetTokenService().CreateToken(user.ID, user.Username)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	if err := h.authService.CreateAuth(c, user.ID, ts); err != nil {
+	if err := auth.GetAuthService().CreateAuth(c, user.ID, ts); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
@@ -60,11 +45,11 @@ func (h *handler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, tokens)
 }
 
-func (h *handler) Logout(c *gin.Context) {
+func Logout(c *gin.Context) {
 	// If metadata is passed and the tokens valid, delete them from the redis store
-	metadata, _ := h.token.ExtractTokenMetadata(c.Request)
+	metadata, _ := auth.GetTokenService().ExtractTokenMetadata(c.Request)
 	if metadata != nil {
-		if err := h.authService.DeleteTokens(c, metadata); err != nil {
+		if err := auth.GetAuthService().DeleteTokens(c, metadata); err != nil {
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
@@ -72,54 +57,14 @@ func (h *handler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, "Successfully logged out")
 }
 
-func (h *handler) CreateTodo(c *gin.Context) {
-	var td Todo
-	if err := c.ShouldBindJSON(&td); err != nil {
-		c.JSON(http.StatusUnprocessableEntity, "invalid json")
-		return
-	}
-	metadata, err := h.token.ExtractTokenMetadata(c.Request)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	userId, err := h.authService.FetchAuthUserId(c, metadata.TokenUuid)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	td.UserID = userId
-
-	// return Todo struct
-	c.JSON(http.StatusCreated, td)
-}
-func (h *handler) GetTodo(c *gin.Context) {
-	metadata, err := h.token.ExtractTokenMetadata(c.Request)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
-
-	userId, err := h.authService.FetchAuthUserId(c, metadata.TokenUuid)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	c.JSON(http.StatusOK, Todo{
-		UserID: userId,
-		Title:  "Return from getting todo",
-		Body:   "Return from getting todo for testing",
-	})
-}
-
-func (h *handler) Refresh(c *gin.Context) {
+func Refresh(c *gin.Context) {
 	tokenMap := map[string]string{}
 	if err := c.ShouldBindJSON(&tokenMap); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	// verify the token
-	token, err := h.token.VerifyTokenRefreshToken(tokenMap["refresh_token"])
+	token, err := auth.GetTokenService().VerifyTokenRefreshToken(tokenMap["refresh_token"])
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, "invalid refresh token")
 		return
@@ -146,18 +91,18 @@ func (h *handler) Refresh(c *gin.Context) {
 			return
 		}
 		// Check refresh token in Redis and delete the previous refresh token
-		if err := h.authService.DeleteRefresh(c, refreshUuid); err != nil {
+		if err := auth.GetAuthService().DeleteRefresh(c, refreshUuid); err != nil {
 			c.JSON(http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		// Create new pairs of refresh and access tokens
-		ts, err := h.token.CreateToken(userId, username)
+		ts, err := auth.GetTokenService().CreateToken(userId, username)
 		if err != nil {
 			c.JSON(http.StatusForbidden, err.Error())
 			return
 		}
 		// Save the tokens metadata to redis
-		if err := h.authService.CreateAuth(c, userId, ts); err != nil {
+		if err := auth.GetAuthService().CreateAuth(c, userId, ts); err != nil {
 			c.JSON(http.StatusForbidden, err.Error())
 			return
 		}
