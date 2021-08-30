@@ -2,11 +2,11 @@ package handlers
 
 import (
 	"net/http"
-	"errors"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"simple-go-auth/pkg/auth"
+	"simple-go-auth/pkg/users"
 )
 
 // handler struct
@@ -15,67 +15,24 @@ type handler struct {
 	token       auth.TokenInterface
 }
 
-func NewHandlers(authService auth.AuthInterface, token auth.TokenInterface) *handler {
-	return &handler{authService, token}
-}
-
-// TODO:
-// - Change ID to uint
-// - Create another package for managing user
-type User struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// Example user for test
-var users = []User{
-	{
-		ID:       "1",
-		Username: "alice",
-		Password: "alice",
-	},
-	{
-		ID:       "2",
-		Username: "bob",
-		Password: "bob",
-	},
-}
-
 type Todo struct {
 	UserID string `json:"user_id"`
 	Title  string `json:"title"`
 	Body   string `json:"body"`
 }
 
-func FindUserByID(id string) (User, error) {
-	for _, u := range users {
-		if id == u.ID {
-			return u, nil
-		}
-	}
-
-	return User{}, errors.New("Not found")
-}
-
-func FindUserByUsername(username string) (User, error) {
-	for _, u := range users {
-		if username == u.Username {
-			return u, nil
-		}
-	}
-
-	return User{}, errors.New("Not found")
+func NewHandlers(authService auth.AuthInterface, token auth.TokenInterface) *handler {
+	return &handler{authService, token}
 }
 
 func (h *handler) Login(c *gin.Context) {
-	var u User
+	var u users.User
 	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, "Invalid json provided")
 		return
 	}
 
-	user, err := FindUserByUsername(u.Username)
+	user, err := users.FindUserByUsername(u.Username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
 		return
