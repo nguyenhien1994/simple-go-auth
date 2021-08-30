@@ -1,22 +1,27 @@
 package handlers
 
 import (
+	"net/http"
+	"errors"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"simple-go-auth/pkg/auth"
-	"net/http"
 )
 
 // handler struct
 type handler struct {
 	authService auth.AuthInterface
-	token auth.TokenInterface
+	token       auth.TokenInterface
 }
 
 func NewHandlers(authService auth.AuthInterface, token auth.TokenInterface) *handler {
 	return &handler{authService, token}
 }
 
+// TODO:
+// - Change ID to uint
+// - Create another package for managing user
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
@@ -24,10 +29,17 @@ type User struct {
 }
 
 // Example user for test
-var user = User{
-	ID:       "1",
-	Username: "username",
-	Password: "password",
+var users = []User{
+	{
+		ID:       "1",
+		Username: "alice",
+		Password: "alice",
+	},
+	{
+		ID:       "2",
+		Username: "bob",
+		Password: "bob",
+	},
 }
 
 type Todo struct {
@@ -36,19 +48,46 @@ type Todo struct {
 	Body   string `json:"body"`
 }
 
+func FindUserByID(id string) (User, error) {
+	for _, u := range users {
+		if id == u.ID {
+			return u, nil
+		}
+	}
+
+	return User{}, errors.New("Not found")
+}
+
+func FindUserByUsername(username string) (User, error) {
+	for _, u := range users {
+		if username == u.Username {
+			return u, nil
+		}
+	}
+
+	return User{}, errors.New("Not found")
+}
+
 func (h *handler) Login(c *gin.Context) {
 	var u User
 	if err := c.ShouldBindJSON(&u); err != nil {
 		c.JSON(http.StatusUnprocessableEntity, "Invalid json provided")
 		return
 	}
+
+	user, err := FindUserByUsername(u.Username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
+		return
+	}
+
 	// compare the user from the request with sample user defined above
 	if user.Username != u.Username || user.Password != u.Password {
 		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
 		return
 	}
 
-	ts, err := h.token.CreateToken(user.ID)
+	ts, err := h.token.CreateToken(user.ID, user.Username)
 	if err != nil {
 		c.JSON(http.StatusUnprocessableEntity, err.Error())
 		return
@@ -97,6 +136,24 @@ func (h *handler) CreateTodo(c *gin.Context) {
 	// return Todo struct
 	c.JSON(http.StatusCreated, td)
 }
+func (h *handler) GetTodo(c *gin.Context) {
+	metadata, err := h.token.ExtractTokenMetadata(c.Request)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	userId, err := h.authService.FetchAuthUserId(c, metadata.TokenUuid)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	c.JSON(http.StatusOK, Todo{
+		UserID: userId,
+		Title:  "Return from getting todo",
+		Body:   "Return from getting todo for testing",
+	})
+}
 
 func (h *handler) Refresh(c *gin.Context) {
 	tokenMap := map[string]string{}
@@ -118,12 +175,17 @@ func (h *handler) Refresh(c *gin.Context) {
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		refreshUuid, ok := claims["refresh_uuid"].(string)
 		if !ok {
-			c.JSON(http.StatusUnprocessableEntity, err)
+			c.JSON(http.StatusUnprocessableEntity, "unauthorized: missing refresh_uuid")
 			return
 		}
 		userId, ok := claims["user_id"].(string)
 		if !ok {
-			c.JSON(http.StatusUnprocessableEntity, "unauthorized")
+			c.JSON(http.StatusUnprocessableEntity, "unauthorized: missing user_id")
+			return
+		}
+		username, ok := claims["user_name"].(string)
+		if !ok {
+			c.JSON(http.StatusUnprocessableEntity, "unauthorized: missing user_name")
 			return
 		}
 		// Check refresh token in Redis and delete the previous refresh token
@@ -132,7 +194,7 @@ func (h *handler) Refresh(c *gin.Context) {
 			return
 		}
 		// Create new pairs of refresh and access tokens
-		ts, err := h.token.CreateToken(userId)
+		ts, err := h.token.CreateToken(userId, username)
 		if err != nil {
 			c.JSON(http.StatusForbidden, err.Error())
 			return

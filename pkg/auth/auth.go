@@ -11,6 +11,7 @@ import (
 
 type AccessDetails struct {
 	TokenUuid string
+	Username  string
 	UserId    string
 }
 

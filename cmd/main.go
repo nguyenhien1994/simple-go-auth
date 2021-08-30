@@ -2,9 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-
 	"log"
 	"net/http"
 	"os"
@@ -14,6 +11,10 @@ import (
 	"simple-go-auth/pkg/middleware"
 	"simple-go-auth/pkg/redis"
 	"syscall"
+
+	"github.com/casbin/casbin/persist/file-adapter"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func init() {
@@ -36,14 +37,21 @@ func main() {
 
 	redisClient := redis.GetRedisClient(redisInfo)
 	authService := auth.NewAuthService(redisClient)
-	tokenUtils  := auth.NewTokenUtils(os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
-	handlers    := handlers.NewHandlers(authService, tokenUtils)
-	mid         := middleware.NewMiddleWare(tokenUtils)
+	tokenUtils := auth.NewTokenUtils(os.Getenv("ACCESS_SECRET"), os.Getenv("REFRESH_SECRET"))
+	handlers := handlers.NewHandlers(authService, tokenUtils)
+	mid := middleware.NewMiddleWare(tokenUtils)
+
+	fileAdapter := fileadapter.NewAdapter("config/policy.csv")
 
 	router := gin.Default()
 	router.POST("/login", handlers.Login)
-	router.POST("/todo", mid.TokenAuthMiddleware(), handlers.CreateTodo)
-	router.POST("/logout", mid.TokenAuthMiddleware(), handlers.Logout)
+	authorized := router.Group("/")
+	authorized.Use(mid.TokenAuthMiddleware())
+	{
+		authorized.POST("/api/todo", mid.Authorize("resource", "write", fileAdapter), handlers.CreateTodo)
+		authorized.GET("/api/todo", mid.Authorize("resource", "read", fileAdapter), handlers.GetTodo)
+		authorized.POST("/logout", handlers.Logout)
+	}
 	router.POST("/refresh", handlers.Refresh)
 
 	srv := &http.Server{

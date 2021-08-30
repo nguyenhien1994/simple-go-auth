@@ -31,13 +31,13 @@ func NewTokenUtils(accessSecret string, refreshSecret string) *tokenUtils {
 }
 
 type TokenInterface interface {
-	CreateToken(userId string) (*TokenDetails, error)
+	CreateToken(userId string, username string) (*TokenDetails, error)
 	ExtractTokenMetadata(*http.Request) (*AccessDetails, error)
 	TokenValid(r *http.Request) error
 	VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error)
 }
 
-func (t *tokenUtils) CreateToken(userId string) (*TokenDetails, error) {
+func (t *tokenUtils) CreateToken(userId string, username string) (*TokenDetails, error) {
 	td := generateNewTokenDetails(userId)
 
 	var err error
@@ -45,6 +45,7 @@ func (t *tokenUtils) CreateToken(userId string) (*TokenDetails, error) {
 	atClaims := jwt.MapClaims{}
 	atClaims["access_uuid"] = td.TokenUuid
 	atClaims["user_id"] = userId
+	atClaims["user_name"] = username
 	atClaims["exp"] = td.AtExpires
 	at := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
 	td.AccessToken, err = at.SignedString([]byte(t.accessSecret))
@@ -56,6 +57,7 @@ func (t *tokenUtils) CreateToken(userId string) (*TokenDetails, error) {
 	rtClaims := jwt.MapClaims{}
 	rtClaims["refresh_uuid"] = td.RefreshUuid
 	rtClaims["user_id"] = userId
+	rtClaims["user_name"] = username
 	rtClaims["exp"] = td.RtExpires
 	rt := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
 
@@ -109,12 +111,14 @@ func extract(token *jwt.Token) (*AccessDetails, error) {
 	if ok && token.Valid {
 		accessUuid, ok := claims["access_uuid"].(string)
 		userId, userOk := claims["user_id"].(string)
-		if ok == false || userOk == false {
+		username, usernameOk := claims["user_name"].(string)
+		if ok == false || userOk == false || usernameOk == false {
 			return nil, errors.New("unauthorized")
 		} else {
 			return &AccessDetails{
 				TokenUuid: accessUuid,
 				UserId:    userId,
+				Username:  username,
 			}, nil
 		}
 	}
