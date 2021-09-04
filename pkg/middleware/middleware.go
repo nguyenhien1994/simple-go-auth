@@ -7,13 +7,14 @@ import (
 	"simple-go-auth/pkg/auth"
 )
 
-func TokenAuthMiddleware() gin.HandlerFunc {
+func AuthenHandler() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := auth.GetTokenService().TokenValid(c.Request); err != nil {
-			c.JSON(http.StatusUnauthorized, "unauthorized")
-			c.Abort()
+		accessDetails, err := auth.GetTokenService().AccessDetailsFromRequest(c.Request)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, "unauthorized")
 			return
 		}
+		c.Set(auth.ContextAccessDetailsKey, accessDetails)
 		c.Next()
 	}
 }
@@ -21,15 +22,11 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 // Authorize determines if current subject has been authorized to take an action on an object.
 func Authorize(obj string, act string, enforcer *casbin.Enforcer) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		metadata, err := auth.GetTokenService().ExtractTokenMetadata(c.Request)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, "unauthorized")
-			return
-		}
+		accessDetails := c.MustGet(auth.ContextAccessDetailsKey).(*auth.AccessDetails)
 		// casbin enforces policy
-		ok := enforcer.Enforce(metadata.Username, obj, act)
+		ok := enforcer.Enforce(accessDetails.Username, obj, act)
 		if !ok {
-			c.AbortWithStatusJSON(403, "forbidden")
+			c.AbortWithStatusJSON(http.StatusForbidden, "forbidden")
 			return
 		}
 		c.Next()

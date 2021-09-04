@@ -47,9 +47,9 @@ func Login(c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	// If metadata is passed and the tokens valid, delete them from the redis store
-	metadata, _ := auth.GetTokenService().ExtractTokenMetadata(c.Request)
-	if metadata != nil {
-		if err := auth.GetAuthService().DeleteTokens(c, metadata); err != nil {
+	accessDetails := c.MustGet(auth.ContextAccessDetailsKey).(*auth.AccessDetails)
+	if accessDetails != nil {
+		if err := auth.GetAuthService().DeleteTokens(c, accessDetails); err != nil {
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
@@ -66,10 +66,6 @@ func Refresh(c *gin.Context) {
 	// verify the token
 	token, err := auth.GetTokenService().VerifyTokenRefreshToken(tokenMap["refresh_token"])
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, "invalid refresh token")
-		return
-	}
-	if _, ok := token.Claims.(jwt.Claims); !ok || !token.Valid {
 		c.JSON(http.StatusUnauthorized, err)
 		return
 	}

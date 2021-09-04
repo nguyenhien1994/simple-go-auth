@@ -19,12 +19,8 @@ func CreateTodo(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, "invalid json")
 		return
 	}
-	metadata, err := auth.GetTokenService().ExtractTokenMetadata(c.Request)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
-	userId, err := auth.GetAuthService().FetchAuthUserId(c, metadata.TokenUuid)
+	accessDetails := c.MustGet(auth.ContextAccessDetailsKey).(*auth.AccessDetails)
+	userId, err := auth.GetAuthService().FetchAuthUserId(c, accessDetails.TokenUuid)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return
@@ -35,13 +31,9 @@ func CreateTodo(c *gin.Context) {
 	c.JSON(http.StatusCreated, td)
 }
 func GetTodo(c *gin.Context) {
-	metadata, err := auth.GetTokenService().ExtractTokenMetadata(c.Request)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, "unauthorized")
-		return
-	}
+	accessDetails := c.MustGet(auth.ContextAccessDetailsKey).(*auth.AccessDetails)
 
-	userId, err := auth.GetAuthService().FetchAuthUserId(c, metadata.TokenUuid)
+	userId, err := auth.GetAuthService().FetchAuthUserId(c, accessDetails.TokenUuid)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, "unauthorized")
 		return

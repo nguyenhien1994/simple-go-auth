@@ -27,6 +27,10 @@ type TokenService struct {
 	refreshSecret string
 }
 
+const (
+	ContextAccessDetailsKey = "access-details"
+)
+
 var tokenUtilsInstance *TokenService
 var tokenUtilsInstanceOnce sync.Once
 
@@ -38,10 +42,9 @@ func GetTokenService() *TokenService {
 }
 
 type TokenInterface interface {
-	CreateToken(userId string, username string) (*TokenDetails, error)
-	ExtractTokenMetadata(*http.Request) (*AccessDetails, error)
-	TokenValid(r *http.Request) error
-	VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error)
+	CreateToken(string, string) (*TokenDetails, error)
+	AccessDetailsFromRequest(*http.Request) (*AccessDetails, error)
+	VerifyTokenRefreshToken(string) (*jwt.Token, error)
 }
 
 func (t *TokenService) CreateToken(userId string, username string) (*TokenDetails, error) {
@@ -75,32 +78,32 @@ func (t *TokenService) CreateToken(userId string, username string) (*TokenDetail
 	return td, nil
 }
 
-func (t *TokenService) ExtractTokenMetadata(r *http.Request) (*AccessDetails, error) {
+func (t *TokenService) AccessDetailsFromRequest(r *http.Request) (*AccessDetails, error) {
 	token, err := verifyAccessToken(r)
 	if err != nil {
 		return nil, err
 	}
-	acc, err := extract(token)
+	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
+		return nil, errors.New("Invalid token")
+	}
+	acc, err := tokenToAccessDetails(token)
 	if err != nil {
 		return nil, err
 	}
 	return acc, nil
 }
 
-func (t *TokenService) TokenValid(r *http.Request) error {
-	token, err := verifyAccessToken(r)
-	if err != nil {
-		return err
-	}
-	if _, ok := token.Claims.(jwt.Claims); !ok && !token.Valid {
-		return err
-	}
-	return nil
-}
-
 func (t *TokenService) VerifyTokenRefreshToken(tokenStr string) (*jwt.Token, error) {
-	// verify the token
-	return verifyToken(tokenStr, t.refreshSecret)
+	// verify the refresh token
+	token, err := verifyToken(tokenStr, t.refreshSecret)
+	if err != nil {
+		return nil, errors.New("invalid refresh token")
+	}
+	if _, ok := token.Claims.(jwt.Claims); !ok || !token.Valid {
+		return nil, errors.New("invalid refresh token")
+	}
+
+	return token, nil
 }
 
 // get the token from the request body
@@ -113,7 +116,7 @@ func extractToken(r *http.Request) string {
 	return ""
 }
 
-func extract(token *jwt.Token) (*AccessDetails, error) {
+func tokenToAccessDetails(token *jwt.Token) (*AccessDetails, error) {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if ok && token.Valid {
 		accessUuid, ok := claims["access_uuid"].(string)
@@ -129,7 +132,7 @@ func extract(token *jwt.Token) (*AccessDetails, error) {
 			}, nil
 		}
 	}
-	return nil, errors.New("failed to extract token from request")
+	return nil, errors.New("failed to extract access details from request")
 }
 
 func generateNewTokenDetails(userId string) *TokenDetails {

@@ -8,7 +8,7 @@ import (
 func (s *Server) InitializeRoutes() {
 	s.Router.POST("/login", api.Login)
 	authorized := s.Router.Group("/")
-	authorized.Use(middleware.TokenAuthMiddleware())
+	authorized.Use(middleware.AuthenHandler())
 	{
 		authorized.POST("/api/todo", middleware.Authorize("resource", "write", s.Enforcer), api.CreateTodo)
 		authorized.GET("/api/todo", middleware.Authorize("resource", "read", s.Enforcer), api.GetTodo)
