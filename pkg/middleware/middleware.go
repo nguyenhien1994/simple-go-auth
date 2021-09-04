@@ -1,14 +1,10 @@
 package middleware
 
 import (
-	"log"
-	"fmt"
-
+	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"simple-go-auth/pkg/auth"
-	"github.com/casbin/casbin"
-	"github.com/casbin/casbin/persist"
 )
 
 func TokenAuthMiddleware() gin.HandlerFunc {
@@ -23,40 +19,19 @@ func TokenAuthMiddleware() gin.HandlerFunc {
 }
 
 // Authorize determines if current subject has been authorized to take an action on an object.
-func Authorize(obj string, act string, adapter persist.Adapter) gin.HandlerFunc {
+func Authorize(obj string, act string, enforcer *casbin.Enforcer) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		err := auth.GetTokenService().TokenValid(c.Request)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, "user hasn't logged in yet")
-			c.Abort()
-			return
-		}
 		metadata, err := auth.GetTokenService().ExtractTokenMetadata(c.Request)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, "unauthorized")
 			return
 		}
 		// casbin enforces policy
-		ok, err := enforce(metadata.Username, obj, act, adapter)
-		if err != nil {
-			log.Println(err)
-			c.AbortWithStatusJSON(500, "error occurred when authorizing user")
-			return
-		}
+		ok := enforcer.Enforce(metadata.Username, obj, act)
 		if !ok {
 			c.AbortWithStatusJSON(403, "forbidden")
 			return
 		}
 		c.Next()
 	}
-}
-
-func enforce(sub string, obj string, act string, adapter persist.Adapter) (bool, error) {
-	enforcer := casbin.NewEnforcer("config/rbac_model.conf", adapter)
-	err := enforcer.LoadPolicy()
-	if err != nil {
-		return false, fmt.Errorf("failed to load policy from DB: %w", err)
-	}
-	ok := enforcer.Enforce(sub, obj, act)
-	return ok, nil
 }

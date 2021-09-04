@@ -10,10 +10,9 @@ func (s *Server) InitializeRoutes() {
 	authorized := s.Router.Group("/")
 	authorized.Use(middleware.TokenAuthMiddleware())
 	{
-		authorized.POST("/api/todo", middleware.Authorize("resource", "write", s.FileAdapter), api.CreateTodo)
-		authorized.GET("/api/todo", middleware.Authorize("resource", "read", s.FileAdapter), api.GetTodo)
+		authorized.POST("/api/todo", middleware.Authorize("resource", "write", s.Enforcer), api.CreateTodo)
+		authorized.GET("/api/todo", middleware.Authorize("resource", "read", s.Enforcer), api.GetTodo)
 		authorized.POST("/logout", api.Logout)
 	}
 	s.Router.POST("/refresh", api.Refresh)
 }
-

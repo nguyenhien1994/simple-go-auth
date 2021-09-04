@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/casbin/casbin/persist/file-adapter"
+	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"simple-go-auth/pkg/auth"
@@ -17,17 +17,16 @@ import (
 
 // server struct
 type Server struct {
-	Router      *gin.Engine
-	FileAdapter *fileadapter.Adapter
-	Auth        auth.AuthInterface
-	Token       auth.TokenInterface
+	Router   *gin.Engine
+	Enforcer *casbin.Enforcer
+	Auth     auth.AuthInterface
+	Token    auth.TokenInterface
 }
 
 func (s *Server) Initialize() {
 	s.Auth = auth.GetAuthService()
 	s.Token = auth.GetTokenService()
-	s.FileAdapter = fileadapter.NewAdapter("config/policy.csv")
-
+	s.Enforcer = casbin.NewEnforcer("config/rbac_model.conf", "config/policy.csv")
 	s.Router = gin.Default()
 	s.InitializeRoutes()
 }
