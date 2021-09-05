@@ -29,6 +29,7 @@ type TokenService struct {
 
 const (
 	ContextAccessDetailsKey = "access-details"
+	ContextUserIdKey = "user-id"
 )
 
 var tokenUtilsInstance *TokenService

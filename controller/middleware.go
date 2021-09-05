@@ -14,6 +14,14 @@ func AuthenHandler() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, "unauthorized")
 			return
 		}
+
+		// Fetch user id from Redis
+		userId, err := auth.GetAuthService().FetchAuthUserId(c, accessDetails.TokenUuid)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		c.Set(auth.ContextUserIdKey, userId)
 		c.Set(auth.ContextAccessDetailsKey, accessDetails)
 		c.Next()
 	}

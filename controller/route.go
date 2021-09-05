@@ -11,8 +11,8 @@ func (s *Server) InitializeRoutes() {
 	authGroup := s.Router.Group("/")
 	authGroup.Use(AuthenHandler())
 	{
-		authGroup.POST("/api/todo", Authorize("resource", "write", s.Enforcer), api.CreateTodo)
-		authGroup.GET("/api/todo", Authorize("resource", "read", s.Enforcer), api.GetTodo)
+		authGroup.PUT("/api/user", Authorize("resource", "write", s.Enforcer), api.UpdateUser)
+		authGroup.GET("/api/user", Authorize("resource", "read", s.Enforcer), api.GetUser)
 		authGroup.POST("/logout", api.Logout)
 	}
 
