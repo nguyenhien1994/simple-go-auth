@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"simple-go-auth/pkg/redis"
+	"simple-go-auth/services/redis"
 )
 
 type AccessDetails struct {

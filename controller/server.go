@@ -1,4 +1,4 @@
-package server
+package controller
 
 import (
 	"context"
@@ -11,8 +11,7 @@ import (
 
 	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	"simple-go-auth/pkg/auth"
+	"simple-go-auth/services/auth"
 )
 
 // server struct
@@ -57,19 +56,3 @@ func (s *Server) Run(addr string) {
 	log.Println("Finished shutdown")
 }
 
-func Run() {
-	server := Server{}
-	var err error
-	err = godotenv.Load()
-	if err != nil {
-		log.Fatalf("Error getting env, not comming through %v", err)
-	} else {
-		fmt.Println("We are getting the env values")
-	}
-
-	appAddr := ":" + os.Getenv("PORT")
-
-	server.Initialize()
-
-	server.Run(appAddr)
-}

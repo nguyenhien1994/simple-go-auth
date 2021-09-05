@@ -3,8 +3,8 @@ package api
 import (
 	"net/http"
 
-	"simple-go-auth/pkg/auth"
-	"simple-go-auth/pkg/users"
+	"simple-go-auth/services/auth"
+	"simple-go-auth/repository/users"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"

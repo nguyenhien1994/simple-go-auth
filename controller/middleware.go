@@ -1,10 +1,10 @@
-package middleware
+package controller
 
 import (
 	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"simple-go-auth/pkg/auth"
+	"simple-go-auth/services/auth"
 )
 
 func AuthenHandler() gin.HandlerFunc {

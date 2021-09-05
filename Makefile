@@ -10,7 +10,7 @@ $(APPS): $(BINDIR)
 	@echo "build $@"
 	@export
 	@echo "gopath $(GOPATH)"
-	@GOPATH=$(GOPATH) $(BINFILE) build -o $(BINDIR)/$@ cmd/*.go
+	@GOPATH=$(GOPATH) $(BINFILE) build -o $(BINDIR)/$@ main.go
 
 test:
 	@GOPATH=$(GOPATH) go test ./...

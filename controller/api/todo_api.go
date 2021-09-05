@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"simple-go-auth/pkg/auth"
+	"simple-go-auth/services/auth"
 )
 
 type Todo struct {
@@ -30,6 +30,7 @@ func CreateTodo(c *gin.Context) {
 	// return Todo struct
 	c.JSON(http.StatusCreated, td)
 }
+
 func GetTodo(c *gin.Context) {
 	accessDetails := c.MustGet(auth.ContextAccessDetailsKey).(*auth.AccessDetails)
 
