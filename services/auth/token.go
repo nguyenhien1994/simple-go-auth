@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,12 +44,12 @@ func GetTokenService() *TokenService {
 }
 
 type TokenInterface interface {
-	CreateToken(string, string) (*TokenDetails, error)
+	CreateToken(int, string) (*TokenDetails, error)
 	AccessDetailsFromRequest(*http.Request) (*AccessDetails, error)
 	VerifyTokenRefreshToken(string) (*jwt.Token, error)
 }
 
-func (t *TokenService) CreateToken(userId string, username string) (*TokenDetails, error) {
+func (t *TokenService) CreateToken(userId int, username string) (*TokenDetails, error) {
 	td := generateNewTokenDetails(userId)
 
 	var err error
@@ -121,14 +122,14 @@ func tokenToAccessDetails(token *jwt.Token) (*AccessDetails, error) {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if ok && token.Valid {
 		accessUuid, ok := claims["access_uuid"].(string)
-		userId, userOk := claims["user_id"].(string)
+		userId, userOk := claims["user_id"].(float64)
 		username, usernameOk := claims["user_name"].(string)
 		if ok == false || userOk == false || usernameOk == false {
 			return nil, errors.New("unauthorized")
 		} else {
 			return &AccessDetails{
 				TokenUuid: accessUuid,
-				UserId:    userId,
+				UserId:    int(userId),
 				Username:  username,
 			}, nil
 		}
@@ -136,7 +137,7 @@ func tokenToAccessDetails(token *jwt.Token) (*AccessDetails, error) {
 	return nil, errors.New("failed to extract access details from request")
 }
 
-func generateNewTokenDetails(userId string) *TokenDetails {
+func generateNewTokenDetails(userId int) *TokenDetails {
 	td := &TokenDetails{}
 	// access token expires after 10 min
 	td.AtExpires = time.Now().Add(time.Minute * 10).Unix()
@@ -144,7 +145,7 @@ func generateNewTokenDetails(userId string) *TokenDetails {
 
 	// refresh token expires after 24h
 	td.RtExpires = time.Now().Add(time.Hour * 24 * 7).Unix()
-	td.RefreshUuid = td.TokenUuid + "++" + userId
+	td.RefreshUuid = td.TokenUuid + "++" + strconv.Itoa(userId)
 
 	return td
 }

@@ -76,7 +76,7 @@ func Refresh(c *gin.Context) {
 			c.JSON(http.StatusUnprocessableEntity, "unauthorized: missing refresh_uuid")
 			return
 		}
-		userId, ok := claims["user_id"].(string)
+		userId, ok := claims["user_id"].(float64)
 		if !ok {
 			c.JSON(http.StatusUnprocessableEntity, "unauthorized: missing user_id")
 			return
@@ -92,13 +92,13 @@ func Refresh(c *gin.Context) {
 			return
 		}
 		// Create new pairs of refresh and access tokens
-		ts, err := auth.GetTokenService().CreateToken(userId, username)
+		ts, err := auth.GetTokenService().CreateToken(int(userId), username)
 		if err != nil {
 			c.JSON(http.StatusForbidden, err.Error())
 			return
 		}
 		// Save the tokens metadata to redis
-		if err := auth.GetAuthService().CreateAuth(c, userId, ts); err != nil {
+		if err := auth.GetAuthService().CreateAuth(c, int(userId), ts); err != nil {
 			c.JSON(http.StatusForbidden, err.Error())
 			return
 		}

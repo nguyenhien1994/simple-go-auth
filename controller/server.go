@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
 	"simple-go-auth/services/auth"
 )
@@ -17,15 +16,16 @@ import (
 // server struct
 type Server struct {
 	Router   *gin.Engine
-	Enforcer *casbin.Enforcer
-	Auth     auth.AuthInterface
-	Token    auth.TokenInterface
+}
+
+func initAuthServices() {
+	auth.GetAuthService()
+	auth.GetTokenService()
+	auth.GetEnforcerService()
 }
 
 func (s *Server) Initialize() {
-	s.Auth = auth.GetAuthService()
-	s.Token = auth.GetTokenService()
-	s.Enforcer = casbin.NewEnforcer("config/rbac_model.conf", "config/policy.csv")
+	initAuthServices()
 	s.Router = gin.Default()
 	s.InitializeRoutes()
 }

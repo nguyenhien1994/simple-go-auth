@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"github.com/casbin/casbin"
 	"github.com/gin-gonic/gin"
 	"net/http"
 	"simple-go-auth/services/auth"
@@ -15,24 +14,23 @@ func AuthenHandler() gin.HandlerFunc {
 			return
 		}
 
-		// Fetch user id from Redis
-		userId, err := auth.GetAuthService().FetchAuthUserId(c, accessDetails.TokenUuid)
+		// Check whether the token expire
+		_, err = auth.GetAuthService().FetchAuthUserId(c, accessDetails.TokenUuid)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, "unauthorized")
 			return
 		}
-		c.Set(auth.ContextUserIdKey, userId)
 		c.Set(auth.ContextAccessDetailsKey, accessDetails)
 		c.Next()
 	}
 }
 
 // Authorize determines if current subject has been authorized to take an action on an object.
-func Authorize(obj string, act string, enforcer *casbin.Enforcer) gin.HandlerFunc {
+func Authorize() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		accessDetails := c.MustGet(auth.ContextAccessDetailsKey).(*auth.AccessDetails)
 		// casbin enforces policy
-		ok := enforcer.Enforce(accessDetails.Username, obj, act)
+		ok := auth.GetEnforcerService().Enforcer(accessDetails.UserId, c.Request)
 		if !ok {
 			c.AbortWithStatusJSON(http.StatusForbidden, "forbidden")
 			return

@@ -13,11 +13,11 @@ import (
 type AccessDetails struct {
 	TokenUuid string
 	Username  string
-	UserId    string
+	UserId    int
 }
 
 type AuthInterface interface {
-	CreateAuth(context.Context, string, *TokenDetails) error
+	CreateAuth(context.Context, int, *TokenDetails) error
 	FetchAuthUserId(context.Context, string) (string, error)
 	DeleteRefresh(context.Context, string) error
 	DeleteTokens(context.Context, *AccessDetails) error
@@ -37,7 +37,7 @@ func GetAuthService() *AuthService {
 }
 
 // Save token metadata to Redis
-func (s *AuthService) CreateAuth(ctx context.Context, userId string, tokenDetails *TokenDetails) error {
+func (s *AuthService) CreateAuth(ctx context.Context, userId int, tokenDetails *TokenDetails) error {
 	// converting Unix to UTC(to Time object)
 	at := time.Unix(tokenDetails.AtExpires, 0)
 	rt := time.Unix(tokenDetails.RtExpires, 0)

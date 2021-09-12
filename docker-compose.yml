@@ -1,0 +1,58 @@
+version: '3'
+services:
+  api-hanlder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    networks:
+      - compose_network
+    ports:
+      - '8080:8080'
+    depends_on:
+      - kelon
+      - mysql
+    stdin_open: true # docker run -i
+    tty: true        # docker run -t
+
+  kelon:
+    image: kelonio/kelon
+    restart: always
+    networks:
+      - compose_network
+    ports:
+      - '8181:8181'
+      - '9191:9191'
+    volumes:
+      - ./kelon/config/:/conf
+      - ./kelon/call-operands/:/call-operands
+      - ./kelon/policies/:/policies
+    environment:
+      - DATASTORE_CONF=/conf/datastore.yml
+      - API_CONF=/conf/api.yml
+      - OPA_CONF=/conf/opa.yml
+      - REGO_DIR=/policies
+      - CONFIG_WATCHER_PATH=/policies
+      # - LOG_LEVEL=DEBUG
+    depends_on:
+      - mysql
+    stdin_open: true
+    tty: true
+
+  mysql:
+    image: mysql:5.7
+    restart: always
+    environment:
+      MYSQL_DATABASE: 'myblog'
+      MYSQL_USER: 'You'
+      MYSQL_PASSWORD: 'SuperSecure'
+      MYSQL_ROOT_PASSWORD: 'root-beats-everything'
+    networks:
+      - compose_network
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./init/init_mysql.sql:/docker-entrypoint-initdb.d/init_mysql.sql
+
+networks:
+  compose_network:
+    driver: bridge
