@@ -19,13 +19,13 @@ func Login(c *gin.Context) {
 
 	user, err := users.FindUserByUsername(u.Username)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
+		c.JSON(http.StatusUnauthorized, "User not found")
 		return
 	}
 
 	// compare the user from the request with sample user defined above
 	if user.Username != u.Username || user.Password != u.Password {
-		c.JSON(http.StatusUnauthorized, "Please provide valid login details")
+		c.JSON(http.StatusUnauthorized, "Wrong password")
 		return
 	}
 

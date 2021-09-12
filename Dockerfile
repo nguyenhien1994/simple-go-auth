@@ -1,16 +1,14 @@
-# build stage
-FROM golang as builder
-# Add dependencies
-WORKDIR /go/src/app
-ADD . /go/src/app
-# Build app
-# RUN go mod download
-RUN go build -o /go/bin/app ./main.go
+FROM golang:latest
 
-# final stage
-FROM alpine:latest
-ARG PORT=8080
+ENV APP_NAME api
+ENV PORT 8080
 
-COPY --from=builder /go/bin/app /
-EXPOSE $PORT
-CMD  ["/app"]
+COPY . /go/src/${APP_NAME}
+WORKDIR /go/src/${APP_NAME}
+
+RUN go get ./
+RUN go build -o ${APP_NAME}
+
+CMD ./${APP_NAME}
+
+EXPOSE ${PORT}

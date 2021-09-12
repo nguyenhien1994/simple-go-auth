@@ -1,18 +1,37 @@
 version: '3'
 services:
-  api-hanlder:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  api:
+    build: .
+    ports:
+     - "8080:8080"
     networks:
       - compose_network
-    ports:
-      - '8080:8080'
     depends_on:
       - kelon
       - mysql
+      - redis
+    environment:
+      REDIS_HOST: 'redis'
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: ''
+      ACCESS_SECRET: '98hbun98hsdfsdwesdfs'
+      REFRESH_SECRET: '786dfdbjhsbsdfsdfsdf'
+      MYSQL_HOST: 'mysql'
+      MYSQL_DATABASE: 'myblog'
+      MYSQL_USER: 'You'
+      MYSQL_PASSWORD: 'SuperSecure'
+      ENFORCER_ENPOINT: http://kelon:8181/v1/data
+      PORT: '8080'
     stdin_open: true # docker run -i
     tty: true        # docker run -t
+
+  redis:
+    image: redis:alpine
+    ports:
+      - 6379:6379
+    restart: always
+    networks:
+      - compose_network
 
   kelon:
     image: kelonio/kelon

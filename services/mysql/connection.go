@@ -24,7 +24,7 @@ var mysqlClientOnce sync.Once
 func GetClientClient() *Client {
 	mysqlClientOnce.Do(func() {
 		mysqlClient = &Client{
-			Host:     "127.0.0.1",
+			Host:     os.Getenv("MYSQL_HOST"),
 			DB:       os.Getenv("MYSQL_DATABASE"),
 			Username: os.Getenv("MYSQL_USER"),
 			Port:     "3306",
@@ -36,7 +36,7 @@ func GetClientClient() *Client {
 
 func (c *Client) getConnectionString(user, pass, host, port, db string) string {
 	return fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True&loc=Local", user, pass, host, port, db,
+		"%s:%s@tcp(%s:%s)/%s?charset=utf8&parseTime=True", user, pass, host, port, db,
 	)
 }
 
